@@ -27,3 +27,5 @@ The simulation solves this coupled system of equations:
 - **Multi-sector reheating**: Decay to SM, dark matter, and dark energy
 - **CP violation**: For matter-antimatter asymmetry
 
+If you use this code, please cite us in your work:
+...
