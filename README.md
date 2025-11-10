@@ -16,7 +16,7 @@ Based on top-down string theory derivations, the simulation tracks the coupled e
 
 The simulation solves this coupled system of equations:
 
-![System of equarions](Images/download.png)
+![System of equations](download.png)
 
 ## Features
 
