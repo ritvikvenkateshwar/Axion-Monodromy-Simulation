@@ -1,8 +1,8 @@
-# Axion Monodromy Cosmic Evolution Simulator
+# Axion Monodromy Cosmic Evolution Simulation
 
 A Python simulation of cosmic inflation and reheating using axion monodromy from Type IIB string theory, evolving the universe from inflation through dark energy domination.
 
-## 📖 Overview
+##  Overview
 
 This code implements a comprehensive cosmological model where an axion field serves as:
 - **The inflaton** driving exponential expansion
@@ -12,7 +12,7 @@ This code implements a comprehensive cosmological model where an axion field ser
 
 Based on top-down string theory derivations, the simulation tracks the coupled evolution of the axion field, gauge fields, and cosmological energy components.
 
-## 🧮 Physical System
+##  Physical System
 
 The simulation solves this coupled system of equations:
 
@@ -34,7 +34,7 @@ The simulation solves this coupled system of equations:
 }
 \end{equation}
 
-## 🚀 Features
+## Features
 
 - **Full coupled system**: Axion field, gauge fields, and cosmological fluids
 - **String theory parameters**: Derived from Type IIB compactification
@@ -43,9 +43,3 @@ The simulation solves this coupled system of equations:
 - **Multi-sector reheating**: Decay to SM, dark matter, and dark energy
 - **CP violation**: For matter-antimatter asymmetry
 
-## 🔧 Installation
-
-```bash
-git clone https://github.com/your-username/axion-monodromy-simulation.git
-cd axion-monodromy-simulation
-pip install -r requirements.txt
