@@ -69,11 +69,22 @@ A_dot_DE_initial = 0.0
 
 @njit
 def axionPotential(mu, phi, Lambda, fa, epsilon):
-    return mu**3 * np.sqrt(phi**2 + epsilon**2) + Lambda**4 * (1 - np.cos(phi / fa))
-
+    linear_like = mu**3 * np.sqrt(phi**2 + epsilon**2)
+    oscillations = Lambda**4 * (1.0 - np.cos(phi / fa))
+    
+    return linear_like + oscillations
 @njit
 def dVdphi(mu, phi, Lambda, fa, epsilon):
-    return mu**3 * phi / np.sqrt(phi**2 + epsilon**2) - (Lambda**4 / fa) * np.sin(phi / fa)
+    # Linear term derivative
+    if abs(phi) > 1e-10:
+        dV_linear = mu**3 * phi / np.sqrt(phi**2 + epsilon**2)
+    else:
+        dV_linear = mu**3 * phi / epsilon  # Regularized
+    
+    # Oscillation term derivative: d/dφ [Λ⁴(1 - cos(φ/f))] = (Λ⁴/f) sin(φ/f)
+    dV_osc = (Lambda**4 / fa) * np.sin(phi / fa)
+    
+    return dV_linear + dV_osc  # PLUS sign!
 
 @njit
 def wde(a, w0=-0.971, wa=-0.62):
