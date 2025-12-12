@@ -368,8 +368,8 @@ def load_simulation(filename="simulation_checkpoint.pkl"):
 
 """Run Simulation of Inflation Era"""
 
-def run_multi_k_simulation(N_final,
-        k_min=1e-8, k_max=1e1, n_k=200,
+def run_multi_k_simulation(N_final, n_k,
+        k_min=1e-8, k_max=1e1,
         a_start=1e-30,
         phi0=None, phi_dot0=None,
         params_extra=None,
@@ -392,7 +392,7 @@ def run_multi_k_simulation(N_final,
     Gamma_phi_dm_fix = Gamma_base * 1e-12
     Gamma_phi_de_fix = Gamma_base * 1e-14
 
-    alpha_SM_fix = 1e-5
+    alpha_fix = 1e-5
     Gamma_tot_fix = Gamma_phi_r_fix + Gamma_phi_dm_fix + Gamma_phi_de_fix
     Gamma_A_SM_r_fix = Gamma_phi_r_fix
     Gamma_A_Hid_dm_fix = Gamma_phi_dm_fix
@@ -492,7 +492,7 @@ def run_multi_k_simulation(N_final,
         params = {
             'k_array': k_array,
             'integration_weights': integration_weights,
-            'alpha': alpha_SM_fix,
+            'alpha': alpha_fix,
             'fa': fa_fix,
             'mu': mu_fix,
             'Lambda': Lambda_fix,
@@ -769,7 +769,7 @@ def load_simulation_data(filename="multi_k_checkpoint.pkl"):
 
 # ---------------- RUN AND PLOT ----------------
 N_final = 80
-#sol_state = run_multi_k_simulation(N_final=N_final, checkpoint_file="multi_k_checkpoint.pkl", resume=True)
+sol_state = run_multi_k_simulation(N_final=N_final, n_k=10, checkpoint_file="multi_k_checkpoint.pkl", resume=True)
 sol_state = load_simulation_data(filename="multi_k_checkpoint.pkl")
 
 if sol_state is not None and len(sol_state['t']) > 1:
