@@ -2392,7 +2392,7 @@ def run_complete_post_inflation_checks(sol_state):
             print(f"   ⚠️ Check failed: {e}")
             results[name] = False
 
-    # Summary
+    #Summary
     print("\n" + "="*70)
     print("SUMMARY OF CHECKS")
     print("="*70)
