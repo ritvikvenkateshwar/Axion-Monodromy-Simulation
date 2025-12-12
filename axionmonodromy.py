@@ -13,7 +13,6 @@ from scipy.interpolate import interp1d
 from scipy.integrate import simpson as simps
 
 g_star = 100
-@njit
 def axionPotential(mu, phi, Lambda, fa, epsilon):
     linear_like = mu**3 * np.sqrt(phi**2 + epsilon**2)
     oscillations = Lambda**4 * (1.0 - np.cos(phi / fa))
@@ -68,10 +67,6 @@ def compute_J_gauge(A, A_dot, k, alpha, fa, M_pl):
     return - (1/M_pl)*(alpha / (fa * M_pl)) * E_dot_B
 
 def bd_initial_conditions(k, a_start, H_start):
-    """
-    Robust BD initial conditions for axion-gauge simulations.
-    Handles the extreme scale a_start = 1e-30 properly.
-    """
     # For numerical stability
     k_safe = max(k, 1e-30)
     a_safe = max(a_start, 1e-30)
@@ -109,8 +104,6 @@ def bd_initial_conditions(k, a_start, H_start):
     A_dot_rescaled = np.clip(A_dot_rescaled, -1e-5, 1e-5)
     
     return A_rescaled, A_dot_rescaled
-
-
 def init_mode_bank(k_array, a_start, H_start):
     """Initialize gauge fields with BD vacuum."""
     n_k = len(k_array)
@@ -127,6 +120,18 @@ def make_k_grid(k_min, k_max, n_k, spacing='log'):
         return np.exp(np.linspace(np.log(k_min), np.log(k_max), n_k))
     else:
         return np.linspace(k_min, k_max, n_k)
+def compute_H_nonjit(phi, phi_dot, rho_r, rho_dm, rho_de, rho_A, mu, Lambda, fa, epsilon):
+    """Non-JIT version for use in analysis/plotting code"""
+    V_phi = axionPotential(mu, phi, Lambda, fa, epsilon)
+    rho_phi = 0.5 * phi_dot**2 + V_phi
+    rho_total = rho_phi + rho_r + rho_dm + rho_de + rho_A
+
+    if rho_total <= 0:
+        return 1e-30
+
+    H = np.sqrt(rho_total / 3.0)
+
+    return np.clip(H, 1e-30, 1e20)
 
 """Trapezoid Rule"""
 
@@ -345,7 +350,7 @@ def run_multi_k_simulation(N_final, n_k,
     M_pl_fix = 1.0  # In Planck units
     energy_scale = 2.4e18  # GeV per Planck unit
     
-    # String theory parameters (MODERATE VALUES FOR STABILITY)
+    # String theory parameters 
     g_s = 0.1  
     CY_volume = 1e14  
     cycle_volume = 1000  
@@ -745,7 +750,7 @@ def load_simulation_data(filename="multi_k_checkpoint.pkl"):
 
 # ---------------- RUN AND PLOT ----------------
 N_final = 80
-n_k = 10
+n_k = 200
 checkpoint_file = "multi_k_checkpoint.pkl"
 
 # First check if we have a previous simulation
@@ -839,8 +844,10 @@ if sol_state is not None and len(sol_state['t']) > 1:
         E_dot_B_total[i] = np.sum(E_dot_B_k * integration_weights)
 
     # Calculate Hubble parameter
-    H = np.array([compute_H(phi[i], phi_dot[i], rho_r[i], rho_dm[i], rho_de[i], rho_A_total[i],
-                          mu_sim, Lambda_sim, fa_sim, epsilon_sim) for i in range(len(t))])
+    H = np.zeros(len(t))
+    for i in range(len(t)):
+        H[i] = compute_H_nonjit(phi[i], phi_dot[i], rho_r[i], rho_dm[i], rho_de[i], rho_A_total[i],
+                        mu_sim, Lambda_sim, fa_sim, epsilon_sim)
 
     w = np.array([wde(a[i]) for i in range(len(t))])
 
@@ -958,276 +965,6 @@ else:
 
 Compute Observables
 """
-
-def compute_observables(sol_state, physical_units=True):
-    # Extract data
-    t = sol_state['t']
-    y = sol_state['y']
-    k_array = sol_state['k_array']
-    params = sol_state['params']
-
-    # Parameters
-    mu = params['mu']
-    Lambda = params['Lambda']
-    fa = params['fa']
-    epsilon = params['epsilon']
-    M_pl = params.get('M_pl', 1.0)
-
-    # Extract variables
-    phi = y[0]
-    phi_dot = y[1]
-    rho_r = y[2]
-    rho_dm = y[3]
-    rho_de = y[4]
-    a = y[5]
-
-    # Compute derived quantities
-    n_k = len(k_array)
-    integration_weights = params.get('integration_weights',
-                                     init_integration_weights(k_array))
-
-    # Calculate inflaton potential and energy
-    V = np.array([axionPotential(mu, phi[i], Lambda, fa, epsilon)
-                  for i in range(len(t))])
-    rho_phi = 0.5 * phi_dot**2 + V
-
-    # Compute gauge field contributions
-    rho_A_total = np.zeros(len(t))
-    E_dot_B_total = np.zeros(len(t))
-
-    for i in range(len(t)):
-        rho_A_k = np.zeros(n_k)
-        E_dot_B_k = np.zeros(n_k)
-        for j in range(n_k):
-            A_idx = 7 + 2*j
-            A_dot_idx = 7 + 2*j + 1
-            A_val = y[A_idx, i]
-            A_dot_val = y[A_dot_idx, i]
-            k_val = k_array[j]
-            rho_A_k[j] = compute_rho_A(A_val, A_dot_val, k_val, a[i])
-            E_dot_B_k[j] = - (k_val * A_val * A_dot_val) / (a[i]**2)
-
-        rho_A_total[i] = np.sum(rho_A_k * integration_weights)
-        E_dot_B_total[i] = np.sum(E_dot_B_k * integration_weights)
-
-    # Compute Hubble parameter
-    H = np.array([compute_H(phi[i], phi_dot[i], rho_r[i], rho_dm[i], rho_de[i],
-                           rho_A_total[i], mu, Lambda, fa, epsilon)
-                 for i in range(len(t))])
-
-    # Compute slow-roll parameters
-    epsilon_H = -H_dot/H**2 if len(H) > 1 else np.zeros_like(H)
-    eta_H = -H_ddot/(H*H_dot) if len(H) > 2 else np.zeros_like(H)
-
-    # Approximate derivatives
-    if len(t) > 1:
-        dt = np.gradient(t)
-        H_dot = np.gradient(H, dt)
-        epsilon_H = -H_dot / H**2
-
-        if len(H) > 2:
-            H_ddot = np.gradient(H_dot, dt)
-            eta_H = -H_ddot / (H * H_dot)
-
-    # Inflationary observables
-    n_s = 1 - 2 * epsilon_H - eta_H  # Scalar spectral index
-    r = 16 * epsilon_H  # Tensor-to-scalar ratio (standard single-field)
-
-    # Calculate gauge-enhanced tensor perturbations
-    xi = params['alpha'] * phi_dot / (2 * fa * H * a)
-    P_t_gauge = (2 * H**2 / (np.pi**2 * M_pl**2)) * np.exp(4.3 * xi / (1 + 0.19 * xi**1.5))
-
-    # Effective tensor-to-scalar ratio with gauge fields
-    r_eff = P_t_gauge * (16 * epsilon_H) / (2 * H**2 / (np.pi**2 * M_pl**2))
-
-    # Calculate curvature perturbation power spectrum
-    P_zeta = (H**2 / (8 * np.pi**2 * epsilon_H * M_pl**2)) * (1 + 2.4e-7 * xi**5.4)
-
-    # A_s: amplitude of scalar perturbations at pivot scale k_pivot = 0.05 Mpc^{-1}
-    A_s = P_zeta[-1]
-
-    # Energy fractions
-    total_energy = rho_r + rho_dm + rho_de + rho_phi + rho_A_total
-    Omega_phi = rho_phi / total_energy
-    Omega_r = rho_r / total_energy
-    Omega_dm = rho_dm / total_energy
-    Omega_de = rho_de / total_energy
-    Omega_A = rho_A_total / total_energy
-
-    # Dark energy equation of state
-    w_de = np.array([wde(a[i]) for i in range(len(t))])
-
-    # Effective equation of state for the universe
-    w_eff = (rho_r/3 - rho_de*w_de[-1]) / total_energy if len(t) > 0 else 0
-
-    # Reheating temperature (approximate)
-    T_reh = (30 * rho_r[-1] / (np.pi**2 * 100))**(1/4)
-
-    # Convert to physical units if requested
-    observables = {
-        'scalar_amplitude': A_s,
-        'scalar_spectral_index': n_s[-1] if len(n_s) > 0 else np.nan,
-        'tensor_to_scalar_ratio': r[-1] if len(r) > 0 else np.nan,
-        'tensor_to_scalar_ratio_eff': r_eff[-1] if len(r_eff) > 0 else np.nan,
-        'Hubble_parameter_end': H[-1],
-        'efolds_total': t[-1] - t[0],
-        'reheating_temperature': T_reh,
-        'Omega_phi_end': Omega_phi[-1],
-        'Omega_r_end': Omega_r[-1],
-        'Omega_dm_end': Omega_dm[-1],
-        'Omega_de_end': Omega_de[-1],
-        'Omega_A_end': Omega_A[-1],
-        'w_de_end': w_de[-1] if len(w_de) > 0 else np.nan,
-        'w_eff_end': w_eff,
-        'phi_end': phi[-1],
-        'phi_dot_end': phi_dot[-1],
-        'scale_factor_end': a[-1],
-        'epsilon_H_end': epsilon_H[-1] if len(epsilon_H) > 0 else np.nan,
-        'eta_H_end': eta_H[-1] if len(eta_H) > 0 else np.nan,
-        'gauge_backreaction': np.max(np.abs(E_dot_B_total)) if len(E_dot_B_total) > 0 else 0,
-        'rho_A_max': np.max(rho_A_total) if len(rho_A_total) > 0 else 0
-    }
-
-    if physical_units:
-        # Convert from Planck units to physical units
-        M_pl_GeV = 2.4e18  # GeV
-        observables_phys = {}
-
-        for key, value in observables.items():
-            if 'temperature' in key:
-                observables_phys[key] = value * M_pl_GeV
-            elif 'Hubble' in key:
-                observables_phys[key] = value * M_pl_GeV
-            elif 'phi' in key and 'dot' not in key:
-                observables_phys[key] = value * M_pl_GeV
-            elif 'phi_dot' in key:
-                observables_phys[key] = value * M_pl_GeV**2
-            elif 'rho' in key or 'amplitude' in key:
-                observables_phys[key] = value * M_pl_GeV**4
-            else:
-                observables_phys[key] = value
-
-        return observables_phys
-
-    return observables
-
-def compute_power_spectra(sol_state, k_pivot=0.05):
-    t = sol_state['t']
-    y = sol_state['y']
-    k_array = sol_state['k_array']
-    params = sol_state['params']
-
-    # Extract variables
-    phi = y[0]
-    phi_dot = y[1]
-    a = y[5]
-
-    # Parameters
-    mu = params['mu']
-    Lambda = params['Lambda']
-    fa = params['fa']
-    epsilon = params['epsilon']
-    M_pl = params.get('M_pl', 1.0)
-    alpha = params['alpha']
-
-    # Compute Hubble parameter evolution
-    H = np.array([compute_H(phi[i], phi_dot[i], y[2,i], y[3,i], y[4,i],
-                           np.sum([compute_rho_A(y[7+2*j,i], y[8+2*j,i], k_array[j], a[i])
-                                   for j in range(len(k_array))]),
-                           mu, Lambda, fa, epsilon)
-                 for i in range(len(t))])
-
-    # Compute slow-roll parameters
-    dt = np.gradient(t)
-    H_dot = np.gradient(H, dt)
-    epsilon_H = -H_dot / H**2
-
-    # Axion-gauge coupling parameter
-    xi = alpha * phi_dot / (2 * fa * H * a)
-
-    # Time when each mode crosses the horizon: k = aH
-    horizon_crossing_indices = []
-    for k in k_array:
-        # Find when k ≈ aH
-        horizon_condition = np.abs(k - a * H)
-        idx = np.argmin(horizon_condition)
-        horizon_crossing_indices.append(idx)
-
-    # Compute power spectra at horizon crossing
-    P_s = []  # Scalar power spectrum
-    P_t = []  # Tensor power spectrum (standard + gauge-enhanced)
-
-    for i, k in enumerate(k_array):
-        idx = horizon_crossing_indices[i]
-        if idx < len(H):
-            # Standard single-field part
-            P_s_standard = H[idx]**2 / (8 * np.pi**2 * epsilon_H[idx] * M_pl**2)
-            P_t_standard = 2 * H[idx]**2 / (np.pi**2 * M_pl**2)
-
-            # Gauge field enhancement
-            xi_k = xi[idx]
-            # Enhancement factors (approximate from axion-gauge field literature)
-            f_s = 1 + 2.4e-7 * xi_k**5.4 if xi_k > 0 else 1
-            f_t = np.exp(4.3 * xi_k / (1 + 0.19 * xi_k**1.5)) if xi_k > 0 else 1
-
-            P_s.append(P_s_standard * f_s)
-            P_t.append(P_t_standard * f_t)
-        else:
-            P_s.append(np.nan)
-            P_t.append(np.nan)
-
-    P_s = np.array(P_s)
-    P_t = np.array(P_t)
-
-    # Find pivot scale in our k_array
-    # Need to convert k from Planck units to Mpc^{-1}
-    # Conversion: k_phys [Mpc^{-1}] = k * M_pl / (Mpc in Planck units)
-    Mpc_in_Planck = 1.56e38
-    k_phys_Mpc = k_array * M_pl / Mpc_in_Planck
-
-    # Interpolate to find value at k_pivot
-    if len(k_phys_Mpc) > 1 and np.min(k_phys_Mpc) < k_pivot < np.max(k_phys_Mpc):
-        logP_s_interp = interp1d(np.log(k_phys_Mpc), np.log(P_s),
-                                 bounds_error=False, fill_value='extrapolate')
-        A_s_at_pivot = np.exp(logP_s_interp(np.log(k_pivot)))
-    else:
-        A_s_at_pivot = np.nan
-
-    # Compute spectral indices
-    if len(k_phys_Mpc) > 2 and len(P_s) > 2:
-        # Fit power law to scalar spectrum
-        valid = ~np.isnan(P_s) & ~np.isnan(k_phys_Mpc) & (P_s > 0) & (k_phys_Mpc > 0)
-        if np.sum(valid) > 2:
-            logk = np.log(k_phys_Mpc[valid])
-            logP = np.log(P_s[valid])
-            coeffs = np.polyfit(logk, logP, 1)
-            n_s = 1 + coeffs[0]  # P_s ∝ k^{n_s-1}
-        else:
-            n_s = np.nan
-    else:
-        n_s = np.nan
-
-    # Tensor-to-scalar ratio at pivot
-    if not np.isnan(A_s_at_pivot) and len(P_t) > 0:
-        # Interpolate tensor spectrum to pivot
-        logP_t_interp = interp1d(np.log(k_phys_Mpc), np.log(P_t),
-                                 bounds_error=False, fill_value='extrapolate')
-        P_t_at_pivot = np.exp(logP_t_interp(np.log(k_pivot)))
-        r = P_t_at_pivot / A_s_at_pivot
-    else:
-        r = np.nan
-
-    return {
-        'k_physical_Mpc': k_phys_Mpc,
-        'scalar_power_spectrum': P_s,
-        'tensor_power_spectrum': P_t,
-        'A_s': A_s_at_pivot,
-        'n_s': n_s,
-        'r': r,
-        'xi_at_horizon_crossing': [xi[idx] for idx in horizon_crossing_indices],
-        'horizon_crossing_efolds': [t[idx] for idx in horizon_crossing_indices]
-    }
-
 def compute_observables(sol_state, physical_units=True):
     # Extract data
     t = sol_state['t']
@@ -1678,7 +1415,7 @@ def compute_non_gaussianity(sol_state):
     alpha = params['alpha']
     fa = params['fa']
 
-    H = np.array([compute_H(phi[i], phi_dot[i], y[2,i], y[3,i], y[4,i],
+    H = np.array([compute_H_nonjit(phi[i], phi_dot[i], y[2,i], y[3,i], y[4,i],
                            np.sum([compute_rho_A(y[7+2*j,i], y[8+2*j,i],
                                                   sol_state['k_array'][j], a[i])
                                    for j in range(len(sol_state['k_array']))]),
@@ -1698,7 +1435,6 @@ def compute_non_gaussianity(sol_state):
         'xi_max': np.max(xi),
         'xi_end': xi[-1] if len(xi) > 0 else np.nan
     }
-
 def compute_isocurvature_perturbations(sol_state):
     # In axion models, isocurvature perturbations can be important
     # This is a simplified estimate
@@ -1721,7 +1457,6 @@ def compute_isocurvature_perturbations(sol_state):
         }
 
     return {'isocurvature_fraction': np.nan, 'constraint_satisfied': False}
-
 # Compute these additional observables
 print("\n" + "="*60)
 print("NON-GAUSSIANITY AND ISOCURVATURE")
@@ -1804,7 +1539,7 @@ def compute_baryogenesis_from_output_fixed_enhanced(data, delta_CP=0.1,
         mu = params['mu']
         Lambda = params['Lambda']
         epsilon = params['epsilon']
-        H_Planck = np.array([compute_H(phi_Planck[i], phi_dot_Planck[i],
+        H_Planck = np.array([compute_H_nonjit(phi_Planck[i], phi_dot_Planck[i],
                                       rho_r_Planck[i], rho_dm_Planck[i],
                                       rho_de_Planck[i], 0, mu, Lambda, fa, epsilon)
                             for i in range(len(t))])
