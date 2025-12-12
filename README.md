@@ -14,7 +14,7 @@ Based on top-down string theory derivations, the simulation tracks the coupled e
 
 ##  Physical System
 
-The simulation solves this coupled system of equations:
+The simulation solves this coupled system of Ordinary Differential Equations:
 
 ![system_of_equations](download.png)
 
@@ -28,4 +28,4 @@ The simulation solves this coupled system of equations:
 - **CP violation**: For matter-antimatter asymmetry
 
 If you use this code, please cite us in your work:
-...
+Venkateshwar, R, and H Liu. Describing the Early Universe Using Axion Monodromy in 3+1D de Sitter Spacetime. 12 Dec. 2025.
