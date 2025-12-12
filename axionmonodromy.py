@@ -12,61 +12,7 @@ import os
 from scipy.interpolate import interp1d
 from scipy.integrate import simpson as simps
 
-"""Define Constants"""
-
-M_pl = 2.4e18
-T_re = 1e10
 g_star = 100
-rho_total_initial = (np.pi**2 / 30) * g_star * T_re**4
-H_typical = 1e14
-
-Gamma_base = T_re**2 / M_pl
-Gamma_phi_r = Gamma_base * 1e-30
-Gamma_phi_dm = Gamma_base * 1e-32
-Gamma_phi_de = Gamma_base * 1e-34
-Gamma_A_SM_r = Gamma_base * 1e-30
-Gamma_A_Hid_dm = Gamma_base * 1e-32
-Gamma_A_DE_de = Gamma_base * 1e-34
-
-Gamma_tot = Gamma_phi_r + Gamma_phi_dm + Gamma_phi_de
-
-# String theory parameters
-g_10D = 0.1
-alpha_prime_10D = 1.0
-M_pl_10D_units = np.sqrt(2 / ((2 * np.pi) ** 7 * g_10D ** 2 * alpha_prime_10D))
-alpha_prime_4D = alpha_prime_10D / M_pl_10D_units ** 2
-g_s = 0.01
-varrho = 1
-
-# Initial conditions
-fa = 1e13
-phi_initial = 1e12
-phi_dot_initial = -1e5
-Lambda = 1e16
-a_initial = 1
-epsilon = 1e-10
-
-mu = (1 / fa * (varrho / ((2 * np.pi) ** 6 * g_s * (alpha_prime_4D) ** 2))) ** (1 / 3)
-
-# Initial energy densities
-rho_r_initial = 1e-10 * rho_total_initial
-rho_de_initial = 1e-15 * rho_total_initial
-rho_dm_initial = 1e-15 * rho_total_initial
-
-# Gauge field parameters
-alpha_SM = 1e-5
-alpha_Hid = 1e-5
-alpha_DE = 1e-6
-
-A_SM_initial = 1e-15
-A_dot_SM_initial = 0.0
-A_Hid_initial = 1e-15
-A_dot_Hid_initial = 0.0
-A_DE_initial = 1e-16
-A_dot_DE_initial = 0.0
-
-"""Equations"""
-
 @njit
 def axionPotential(mu, phi, Lambda, fa, epsilon):
     linear_like = mu**3 * np.sqrt(phi**2 + epsilon**2)
@@ -84,7 +30,7 @@ def dVdphi(mu, phi, Lambda, fa, epsilon):
     # Oscillation term derivative: d/dφ [Λ⁴(1 - cos(φ/f))] = (Λ⁴/f) sin(φ/f)
     dV_osc = (Lambda**4 / fa) * np.sin(phi / fa)
     
-    return dV_linear + dV_osc  # PLUS sign!
+    return dV_linear + dV_osc  
 
 @njit
 def wde(a, w0=-0.971, wa=-0.62):
@@ -395,33 +341,49 @@ def run_multi_k_simulation(N_final, n_k,
         checkpoint_file="multi_k_checkpoint.pkl",
         resume=False,
         checkpoint_interval=0.01):
+    # ========== STRING THEORY CONSISTENT PARAMETERS (WORKING VERSION) ==========
     M_pl_fix = 1.0  # In Planck units
-    energy_scale = 2.4e18
-    fa_fix = 1e13 / energy_scale
-    phi_initial = 1e9 / energy_scale
-    phi_dot_initial = -1e2 / energy_scale
-    Lambda_fix = 1e14 / energy_scale
-    epsilon_fix = 1e10 / energy_scale
-    T_re = 1e10
-    mu_fix = (1 / fa_fix * (varrho / ((2 * np.pi) ** 6 * g_s * (alpha_prime_4D) ** 2))) ** (1 / 3)
-
-    # Other required constants
-    Gamma_base = T_re**2 / energy_scale
-    Gamma_phi_r_fix = Gamma_base * 1e-10
-    Gamma_phi_dm_fix = Gamma_base * 1e-12
-    Gamma_phi_de_fix = Gamma_base * 1e-14
-
-    alpha_fix = 1e-5
+    energy_scale = 2.4e18  # GeV per Planck unit
+    
+    # String theory parameters (MODERATE VALUES FOR STABILITY)
+    g_s = 0.1  
+    CY_volume = 1e14  
+    cycle_volume = 1000  
+    
+    # Derived scales 
+    M_string = 1.0 / np.sqrt(CY_volume)  # ~1e-7
+    fa_fix = 0.05   
+    
+    # Chern-Simons couplings 
+    n_SM, n_Hid, n_DE = 1, 1, 1  #
+    alpha_fix = 0.01  
+    
+    # Potential parameters 
+    Lambda_fix = 1e-5  
+    mu_fix = 1e-4  
+    epsilon_fix = 1e-10      
+    # Decay rates 
+    Gamma_phi_r_fix = 1e-10
+    Gamma_phi_dm_fix = 1e-12
+    Gamma_phi_de_fix = 1e-14
+    
     Gamma_tot_fix = Gamma_phi_r_fix + Gamma_phi_dm_fix + Gamma_phi_de_fix
     Gamma_A_SM_r_fix = Gamma_phi_r_fix
     Gamma_A_Hid_dm_fix = Gamma_phi_dm_fix
     Gamma_A_DE_de_fix = Gamma_phi_de_fix
-
+    
+    if phi0 == None:
+        phi0 = 1.0  
+    if phi_dot0 == None:
+        phi_dot0 = -1e-6  
+    a_start = 1e-30
+    
     # Initial densities
-    rho_total_initial_fix = (np.pi**2 / 30) * 100 * (1e10**4) / (energy_scale**4)
-    rho_r_initial_fix = 1e-5 * rho_total_initial_fix
-    rho_dm_initial_fix = 1e-8 * rho_total_initial_fix
-    rho_de_initial_fix = 1e-8 * rho_total_initial_fix
+    H_start_initial = np.sqrt(mu_fix**3 * phi0 / 3.0)  
+    rho_total_initial_fix = 3 * H_start_initial**2
+    rho_r_initial_fix = 1e-30 * rho_total_initial_fix 
+    rho_dm_initial_fix = 1e-35 * rho_total_initial_fix
+    rho_de_initial_fix = 1e-35 * rho_total_initial_fix
 
     # -----------------------
     # Resume from checkpoint if requested
@@ -462,11 +424,6 @@ def run_multi_k_simulation(N_final, n_k,
         k_array = np.exp(np.linspace(np.log(k_min), np.log(k_max), n_k))
         integration_weights = init_integration_weights(k_array)
 
-        if phi0 is None:
-            phi0 = 1e-3
-        if phi_dot0 is None:
-            phi_dot0 = -1e0
-
         rho_r0 = rho_r_initial_fix * 1e-3
         rho_dm0 = rho_dm_initial_fix * 1e-3
         rho_de0 = rho_de_initial_fix * 1e-3
@@ -498,8 +455,8 @@ def run_multi_k_simulation(N_final, n_k,
         A0 = np.zeros(n_k) * H_start
         A_dot0 = np.zeros(n_k) * H_start
         for i, k in enumerate(k_array):
-            A0[i] = 1.0 / np.sqrt(2.0 * k) * 1e-25
-            A_dot0[i] = -k * A0[i] * 1e-10
+            A0, A_dot0 = init_mode_bank(k_array, a_start, H_start)
+
 
         y0 = []
         y0.extend([phi0, phi_dot0, rho_r0, rho_dm0, rho_de0, a_start, H_start])
@@ -788,7 +745,27 @@ def load_simulation_data(filename="multi_k_checkpoint.pkl"):
 
 # ---------------- RUN AND PLOT ----------------
 N_final = 80
-sol_state = run_multi_k_simulation(N_final=N_final, n_k=10, checkpoint_file="multi_k_checkpoint.pkl", resume=True)
+n_k = 200
+checkpoint_file = "multi_k_checkpoint.pkl"
+
+# First check if we have a previous simulation
+if os.path.exists(checkpoint_file):
+    print("Found existing checkpoint, resuming...")
+    sol_state = run_multi_k_simulation(
+        N_final=N_final, 
+        n_k=n_k, 
+        checkpoint_file=checkpoint_file,
+        resume=True
+    )
+else:
+    print("No checkpoint found, starting fresh simulation...")
+    sol_state = run_multi_k_simulation(
+        N_final=N_final, 
+        n_k=n_k, 
+        checkpoint_file=checkpoint_file,
+        resume=False
+    )
+
 sol_state = load_simulation_data(filename="multi_k_checkpoint.pkl")
 
 if sol_state is not None and len(sol_state['t']) > 1:
@@ -2382,13 +2359,12 @@ def run_complete_post_inflation_checks(sol_state):
         # Call your function
         violation = check_energy_conservation(y, params, N)
 
-        # Paper's perspective: violation > 1% means model has problems
         print(f"   Energy violation: {violation:.2%}")
-        if violation > 0.01:
-            print(f"   ✓ Paper's claim supported: >1% energy conservation violation")
-            print(f"   ⚠️ Model problematic according to paper's abstract")
+        if violation > 0.01:  # > 1% is problematic
+            print(f"   ⚠️ ENERGY VIOLATION > 1% - Model has conservation issues")
+            print(f"   (Paper claims this shouldn't happen)")
         else:
-            print(f"   ⚠️ Only {violation:.2%} violation - contradicts paper's claim")
+            print(f"   ✓ Energy conserved within 1% - Model OK")
 
         # For check purposes: return True if violation < 1% (normal models)
         # But paper says violation SHOULD be > 1%
