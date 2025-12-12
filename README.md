@@ -27,5 +27,6 @@ The simulation solves this coupled system of Ordinary Differential Equations:
 - **Multi-sector reheating**: Decay to SM, dark matter, and dark energy
 - **CP violation**: For matter-antimatter asymmetry
 - **Post-Inflation Analysis**: We compare the results of the simulation to real life PLANCK data
+
 If you use this code, please cite us in your work:
 Venkateshwar, R, and H Liu. Describing the Early Universe Using Axion Monodromy in 3+1D de Sitter Spacetime. 12 Dec. 2025.
