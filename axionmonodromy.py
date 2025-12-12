@@ -93,7 +93,7 @@ def bd_initial_conditions(k, a_start, H_start):
     
     # Random phase (doesn't matter much but more physical)
     phase = np.random.uniform(0, 2*np.pi)
-    A_rescaled *= np.cos(phase)
+    A_rescaled *= -np.cos(phase)
     
     # Frozen super-horizon: Ȧ ≈ HA
     A_dot_rescaled = H_start * A_rescaled
@@ -750,7 +750,7 @@ def load_simulation_data(filename="multi_k_checkpoint.pkl"):
 
 # ---------------- RUN AND PLOT ----------------
 N_final = 80
-n_k = 200
+n_k = 10
 checkpoint_file = "multi_k_checkpoint.pkl"
 
 # First check if we have a previous simulation
@@ -1461,7 +1461,7 @@ def compute_isocurvature_perturbations(sol_state):
 print("\n" + "="*60)
 print("NON-GAUSSIANITY AND ISOCURVATURE")
 print("="*60)
-
+data = load_simulation_data('multi_k_checkpoint.pkl')
 fNL_data = compute_non_gaussianity(data)
 print(f"\nNon-Gaussianity (equilateral):")
 print(f"   Max f_NL: {fNL_data['f_NL_equilateral_max']:.2f}")
