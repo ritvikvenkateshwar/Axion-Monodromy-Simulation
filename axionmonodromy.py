@@ -745,7 +745,7 @@ def load_simulation_data(filename="multi_k_checkpoint.pkl"):
 
 # ---------------- RUN AND PLOT ----------------
 N_final = 80
-n_k = 200
+n_k = 10
 checkpoint_file = "multi_k_checkpoint.pkl"
 
 # First check if we have a previous simulation
@@ -2392,7 +2392,7 @@ def run_complete_post_inflation_checks(sol_state):
             print(f"   ⚠️ Check failed: {e}")
             results[name] = False
 
-    #Summary
+    # Summary
     print("\n" + "="*70)
     print("SUMMARY OF CHECKS")
     print("="*70)
