@@ -16,7 +16,7 @@ Based on top-down string theory derivations, the simulation tracks the coupled e
 
 The simulation solves this coupled system of equations:
 
-![system_of_equations](https://github.com/[ritvikvenkateshwar]/[Axion-Monodromy-Simulation]/blob/[Images]/download.png?raw=true)
+![system_of_equations](Images/download.png)
 
 ## Features
 
