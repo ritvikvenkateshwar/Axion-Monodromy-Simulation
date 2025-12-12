@@ -1490,7 +1490,7 @@ with open('cosmological_observables.pkl', 'wb') as f:
     pickle.dump(output_data, f)
 print("\nAll observables saved to 'cosmological_observables.pkl'")
 
-def compute_baryogenesis_from_output_fixed_enhanced(data, delta_CP=0.1,
+def compute_baryogenesis_from_output_fixed_enhanced(data, delta_CP=-0.1,
                                                     alpha_SM_factor=1.0,
                                                     alpha_Hid_factor=1.0,
                                                     alpha_DE_factor=1.0):
