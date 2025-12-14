@@ -750,7 +750,7 @@ def load_simulation_data(filename="multi_k_checkpoint.pkl"):
 
 # ---------------- RUN AND PLOT ----------------
 N_final = 80
-n_k = 10
+n_k = 200
 checkpoint_file = "multi_k_checkpoint.pkl"
 
 # First check if we have a previous simulation
@@ -1745,6 +1745,9 @@ def compute_baryogenesis_from_output_fixed_enhanced(data, delta_CP=-0.1,
             if n_gamma > 0 and i < len(B_total):
                 eta_B_total[i] = B_total[i] / n_gamma
                 eta_B_SM[i] = B_SM[i] / n_gamma
+                eta_B_total[i] = abs(eta_B_total[i])
+                eta_B_SM[i] = abs(eta_B_SM[i])
+
 
     print(f"\nBARYON-TO-PHOTON RATIO:")
     print(f"Total η_B = {eta_B_total[-1]:.3e}")
