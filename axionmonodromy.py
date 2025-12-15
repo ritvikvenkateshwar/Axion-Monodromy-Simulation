@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.special import zeta
-#import classy as cl
 from scipy.integrate import solve_ivp
 from scipy.integrate import odeint
 import matplotlib.pyplot as plt
@@ -12,11 +11,16 @@ import os
 from scipy.interpolate import interp1d
 from scipy.integrate import simpson as simps
 
+"""Define Constants"""
+
 g_star = 100
+
+"""Equations"""
+
 def axionPotential(mu, phi, Lambda, fa, epsilon):
     linear_like = mu**3 * np.sqrt(phi**2 + epsilon**2)
     oscillations = Lambda**4 * (1.0 - np.cos(phi / fa))
-    
+
     return linear_like + oscillations
 @njit
 def dVdphi(mu, phi, Lambda, fa, epsilon):
@@ -25,11 +29,11 @@ def dVdphi(mu, phi, Lambda, fa, epsilon):
         dV_linear = mu**3 * phi / np.sqrt(phi**2 + epsilon**2)
     else:
         dV_linear = mu**3 * phi / epsilon  # Regularized
-    
+
     # Oscillation term derivative: d/dφ [Λ⁴(1 - cos(φ/f))] = (Λ⁴/f) sin(φ/f)
     dV_osc = (Lambda**4 / fa) * np.sin(phi / fa)
-    
-    return dV_linear + dV_osc  
+
+    return dV_linear + dV_osc
 
 @njit
 def wde(a, w0=-0.971, wa=-0.62):
@@ -70,49 +74,49 @@ def bd_initial_conditions(k, a_start, H_start):
     # For numerical stability
     k_safe = max(k, 1e-30)
     a_safe = max(a_start, 1e-30)
-    
+
     # Physical momentum at horizon crossing for this mode
     # Not used directly but for reference
     k_horizon_crossing = a_safe * H_start
-    
+
     # Simple approach: initialize with frozen super-horizon approximation
     # The exact initial conditions don't matter much as long as they're small
     # and the equations will evolve them correctly once instability kicks in
-    
+
     # Quantum vacuum amplitude in physical units
     # δA ~ H/(2π) is the typical vacuum fluctuation amplitude
     quantum_amp_physical = H_start / (2*np.pi)
-    
+
     # Convert to rescaled variable: A_rescaled = a × A_physical
     A_rescaled = a_safe * quantum_amp_physical
-    
+
     # Add k-dependence: 1/√k scaling from BD vacuum
     # But for numerical stability, don't let it get too small
     k_factor = 1.0 / np.sqrt(max(k_safe / (a_safe * H_start), 1.0))
     A_rescaled *= k_factor
-    
+
     # Random phase (doesn't matter much but more physical)
     phase = np.random.uniform(0, 2*np.pi)
     A_rescaled *= -np.cos(phase)
-    
+
     # Frozen super-horizon: Ȧ ≈ HA
     A_dot_rescaled = H_start * A_rescaled
-    
+
     # Ensure reasonable numerical range
     # Avoid values < 1e-30 or > 1e10
     A_rescaled = np.clip(A_rescaled, -1e-10, 1e-10)
     A_dot_rescaled = np.clip(A_dot_rescaled, -1e-5, 1e-5)
-    
+
     return A_rescaled, A_dot_rescaled
 def init_mode_bank(k_array, a_start, H_start):
     """Initialize gauge fields with BD vacuum."""
     n_k = len(k_array)
     A0 = np.zeros(n_k)
     A_dot0 = np.zeros(n_k)
-    
+
     for i, k in enumerate(k_array):
         A0[i], A_dot0[i] = bd_initial_conditions(k, a_start, H_start)
-    
+
     return A0, A_dot0
 def make_k_grid(k_min, k_max, n_k, spacing='log'):
     """Return array of k values"""
@@ -303,7 +307,6 @@ def full_system_multik(N, y, params):
         return np.zeros_like(y)
 
 def save_simulation(sol, filename="simulation_checkpoint.pkl"):
-    """Save simulation state"""
     with open(filename, 'wb') as f:
         pickle.dump({
             't': sol.t,
@@ -336,7 +339,7 @@ def load_simulation(filename="simulation_checkpoint.pkl"):
         print(f"No checkpoint found at {filename}")
         return None
 
-"""Run Simulation of Inflation Era"""
+"""Run Simulation of Inflation + Post-Inflation Era"""
 
 def run_multi_k_simulation(N_final, n_k,
         k_min=1e-8, k_max=1e1,
@@ -346,47 +349,47 @@ def run_multi_k_simulation(N_final, n_k,
         checkpoint_file="multi_k_checkpoint.pkl",
         resume=False,
         checkpoint_interval=0.01):
-    # ========== STRING THEORY CONSISTENT PARAMETERS (WORKING VERSION) ==========
+    # ========== PARAMETERS ==========
     M_pl_fix = 1.0  # In Planck units
     energy_scale = 2.4e18  # GeV per Planck unit
-    
-    # String theory parameters 
-    g_s = 0.1  
-    CY_volume = 1e14  
-    cycle_volume = 1000  
-    
-    # Derived scales 
+
+    # String theory parameters
+    g_s = 0.1
+    CY_volume = 1e14
+    cycle_volume = 1000
+
+    # Derived scales
     M_string = 1.0 / np.sqrt(CY_volume)  # ~1e-7
-    fa_fix = 0.05   
-    
-    # Chern-Simons couplings 
-    n_SM, n_Hid, n_DE = 1, 1, 1  #
-    alpha_fix = 0.01  
-    
-    # Potential parameters 
-    Lambda_fix = 1e-5  
-    mu_fix = 1e-4  
-    epsilon_fix = 1e-10      
-    # Decay rates 
+    fa_fix = 0.05
+
+    # Chern-Simons couplings
+    n_SM, n_Hid, n_DE = 1, 1, 1
+    alpha_fix = 0.01
+
+    # Potential parameters
+    Lambda_fix = 1e-5
+    mu_fix = 1e-4
+    epsilon_fix = 1e-10
+    # Decay rates
     Gamma_phi_r_fix = 1e-10
     Gamma_phi_dm_fix = 1e-12
     Gamma_phi_de_fix = 1e-14
-    
+
     Gamma_tot_fix = Gamma_phi_r_fix + Gamma_phi_dm_fix + Gamma_phi_de_fix
     Gamma_A_SM_r_fix = Gamma_phi_r_fix
     Gamma_A_Hid_dm_fix = Gamma_phi_dm_fix
     Gamma_A_DE_de_fix = Gamma_phi_de_fix
-    
+
     if phi0 == None:
-        phi0 = 1.0  
+        phi0 = 1.0
     if phi_dot0 == None:
-        phi_dot0 = -1e-6  
+        phi_dot0 = -1e-6
     a_start = 1e-30
-    
+
     # Initial densities
-    H_start_initial = np.sqrt(mu_fix**3 * phi0 / 3.0)  
+    H_start_initial = np.sqrt(mu_fix**3 * phi0 / 3.0)
     rho_total_initial_fix = 3 * H_start_initial**2
-    rho_r_initial_fix = 1e-30 * rho_total_initial_fix 
+    rho_r_initial_fix = 1e-30 * rho_total_initial_fix
     rho_dm_initial_fix = 1e-35 * rho_total_initial_fix
     rho_de_initial_fix = 1e-35 * rho_total_initial_fix
 
@@ -542,7 +545,6 @@ def run_multi_k_simulation(N_final, n_k,
 
         H_computed = np.sqrt(rho_total / (3 * M_pl_fix**2))
         return H_computed
-
     # -----------------------
     # Integrate in chunks
     # -----------------------
@@ -725,6 +727,8 @@ def run_multi_k_simulation(N_final, n_k,
     print(f"Final Hubble parameter: H={all_H[-1]:.2e}")
     return final_state
 
+"""Load Simulation"""
+
 def load_simulation_data(filename="multi_k_checkpoint.pkl"):
     if not os.path.exists(filename):
         raise FileNotFoundError(f"File {filename} not found!")
@@ -753,20 +757,19 @@ N_final = 80
 n_k = 200
 checkpoint_file = "multi_k_checkpoint.pkl"
 
-# First check if we have a previous simulation
 if os.path.exists(checkpoint_file):
     print("Found existing checkpoint, resuming...")
     sol_state = run_multi_k_simulation(
-        N_final=N_final, 
-        n_k=n_k, 
+        N_final=N_final,
+        n_k=n_k,
         checkpoint_file=checkpoint_file,
         resume=True
     )
 else:
     print("No checkpoint found, starting fresh simulation...")
     sol_state = run_multi_k_simulation(
-        N_final=N_final, 
-        n_k=n_k, 
+        N_final=N_final,
+        n_k=n_k,
         checkpoint_file=checkpoint_file,
         resume=False
     )
@@ -961,10 +964,11 @@ if sol_state is not None and len(sol_state['t']) > 1:
 else:
     print("Simulation failed or has insufficient data")
 
-"""# **POST INFLATION ERA**
+"""# **POST INFLATION ERA ANALYSIS**
 
 Compute Observables
 """
+
 def compute_observables(sol_state, physical_units=True):
     # Extract data
     t = sol_state['t']
@@ -1021,7 +1025,6 @@ def compute_observables(sol_state, physical_units=True):
         rho_A_total[i] = np.sum(rho_A_k * weights)
         E_dot_B_total[i] = np.sum(E_dot_B_k * weights)
 
-    # FIX: Compute Hubble CORRECTLY with ALL energy components
     # H² = (ρ_total) / (3M_pl²) where ρ_total = ρ_phi + ρ_r + ρ_dm + ρ_de + ρ_A
     M_pl_sq = M_pl**2
     H_squared = (rho_phi + rho_r + rho_dm + rho_de + rho_A_total) / (3.0 * M_pl_sq)
@@ -1030,8 +1033,7 @@ def compute_observables(sol_state, physical_units=True):
     H_squared = np.maximum(H_squared, 1e-100)
     H = np.sqrt(H_squared)
 
-    # FIX: Better slow-roll parameter calculation
-    epsilon_H = np.ones_like(H)  # Default to 1 (not in slow-roll)
+    epsilon_H = np.ones_like(H)
     eta_H = np.zeros_like(H)
 
     if len(t) > 1:
@@ -1050,11 +1052,11 @@ def compute_observables(sol_state, physical_units=True):
             valid = mask & (np.abs(H * H_dot) > 1e-60)
             eta_H[valid] = -H_ddot[valid] / (H[valid] * H_dot[valid])
 
-    # Inflationary observables (with bounds)
+    # Inflationary observables
     n_s = 1 - 2 * epsilon_H - eta_H
-    n_s = np.clip(n_s, 0.8, 1.2)  # Reasonable bounds
+    n_s = np.clip(n_s, 0.8, 1.2)
     r = 16 * epsilon_H
-    r = np.clip(r, 0, 0.2)  # Reasonable bounds
+    r = np.clip(r, 0, 0.2)
 
     # Energy fractions (should sum to 1)
     total_energy = rho_phi + rho_r + rho_dm + rho_de + rho_A_total
@@ -1084,7 +1086,7 @@ def compute_observables(sol_state, physical_units=True):
     valid = rho_r > 0
     T_reh[valid] = (30 * rho_r[valid] / (np.pi**2 * 100))**(0.25)
 
-    # Scalar amplitude (with proper handling)
+    # Scalar amplitude
     A_s = np.nan * np.ones_like(H)
     valid = (epsilon_H > 1e-10) & (H > 1e-30)
     A_s[valid] = H[valid]**2 / (8 * np.pi**2 * epsilon_H[valid] * M_pl**2)
@@ -1122,7 +1124,6 @@ def compute_observables(sol_state, physical_units=True):
         pass
 
     return observables
-
 def safe_get(array, index, default):
     if len(array) == 0:
         return default
@@ -1132,7 +1133,6 @@ def safe_get(array, index, default):
         val = array[index]
         return val if np.isfinite(val) else default
     return default
-
 def compute_power_spectra(sol_state, k_pivot=0.05):
     t = sol_state['t']
     y = sol_state['y']
@@ -1152,7 +1152,6 @@ def compute_power_spectra(sol_state, k_pivot=0.05):
     M_pl = params.get('M_pl', 1.0)
     alpha = params.get('alpha', 1e-5)
 
-    # FIX: Compute Hubble CORRECTLY
     V = np.array([axionPotential(mu, phi[i], Lambda, fa, epsilon) for i in range(len(t))])
     rho_phi = 0.5 * phi_dot**2 + V
 
@@ -1181,7 +1180,7 @@ def compute_power_spectra(sol_state, k_pivot=0.05):
     rho_total = rho_phi + rho_r + rho_dm + rho_de + rho_A_total
     H = np.sqrt(np.maximum(rho_total, 1e-100) / (3 * M_pl**2))
 
-    # Compute slow-roll parameters safely
+    # Compute slow-roll parameters
     epsilon_H = np.ones_like(H)
     if len(t) > 1:
         dt = np.gradient(t)
@@ -1192,11 +1191,11 @@ def compute_power_spectra(sol_state, k_pivot=0.05):
         epsilon_H[valid] = -H_dot[valid] / H[valid]**2
         epsilon_H = np.clip(epsilon_H, 1e-10, 10.0)
 
-    # Compute ξ parameter safely
+    # Compute ξ parameter
     xi = np.zeros_like(H)
     valid = (H > 1e-30) & (a > 1e-30) & (fa > 1e-30)
     xi[valid] = alpha * phi_dot[valid] / (2 * fa * H[valid] * a[valid])
-    xi = np.clip(xi, -10, 10)  # Bound to avoid explosion
+    xi = np.clip(xi, -10, 10)
 
     # Compute power spectra
     P_s = np.zeros(len(k_array))
@@ -1215,7 +1214,7 @@ def compute_power_spectra(sol_state, k_pivot=0.05):
             P_s_standard = H_k**2 / (8 * np.pi**2 * epsilon_k * M_pl**2)
             P_t_standard = 2 * H_k**2 / (np.pi**2 * M_pl**2)
 
-            # Gauge enhancement (bounded)
+            # Gauge enhancement
             xi_k = xi[idx]
             f_s = 1 + 2.4e-7 * min(xi_k, 10)**5.4 if xi_k > 0 else 1
             f_t = np.exp(4.3 * xi_k / (1 + 0.19 * abs(xi_k)**1.5)) if xi_k > 0 else 1
@@ -1259,8 +1258,6 @@ def compute_power_spectra(sol_state, k_pivot=0.05):
         'H': H,
         'epsilon_H': epsilon_H
     }
-
-# Now load and compute observables
 try:
     data = load_simulation_data('/content/multi_k_checkpoint.pkl')
 
@@ -1425,7 +1422,6 @@ def compute_non_gaussianity(sol_state):
     # Axion-gauge coupling parameter
     xi = alpha * phi_dot / (2 * fa * H * a)
 
-    # Estimate f_NL from axion-gauge field literature
     # f_NL ~ O(10-100) for ξ ~ few, peaks at equilateral configuration
     f_NL_equilateral = 0.00048 * np.exp(7.3 * xi) / (1 + 0.0019 * np.exp(8.2 * xi))
 
@@ -1436,8 +1432,6 @@ def compute_non_gaussianity(sol_state):
         'xi_end': xi[-1] if len(xi) > 0 else np.nan
     }
 def compute_isocurvature_perturbations(sol_state):
-    # In axion models, isocurvature perturbations can be important
-    # This is a simplified estimate
     t = sol_state['t']
     y = sol_state['y']
 
@@ -1445,7 +1439,7 @@ def compute_isocurvature_perturbations(sol_state):
     H = np.array(sol_state['H']) if 'H' in sol_state else None
 
     if H is not None and len(H) > 0:
-        m_a = 1e-22  # eV scale axion (example)
+        m_a = 1e-22  # eV scale axion
         H_inf = H[0]  # Hubble during inflation
 
         # Isocurvature amplitude estimate: P_S/P_ζ ~ (H_inf/φ)^2
@@ -1457,7 +1451,6 @@ def compute_isocurvature_perturbations(sol_state):
         }
 
     return {'isocurvature_fraction': np.nan, 'constraint_satisfied': False}
-# Compute these additional observables
 print("\n" + "="*60)
 print("NON-GAUSSIANITY AND ISOCURVATURE")
 print("="*60)
@@ -1477,7 +1470,6 @@ if iso_data['constraint_satisfied']:
 else:
     print("   ⚠ May exceed Planck limits")
 
-# Save all observables to file
 output_data = {
     'basic_observables': observables,
     'power_spectra': ps_data,
@@ -1748,7 +1740,6 @@ def compute_baryogenesis_from_output_fixed_enhanced(data, delta_CP=-0.1,
                 eta_B_total[i] = abs(eta_B_total[i])
                 eta_B_SM[i] = abs(eta_B_SM[i])
 
-
     print(f"\nBARYON-TO-PHOTON RATIO:")
     print(f"Total η_B = {eta_B_total[-1]:.3e}")
     print(f"SM η_B    = {eta_B_SM[-1]:.3e} (only SM sector matters for baryons)")
@@ -1911,6 +1902,95 @@ baryo_results = compute_baryogenesis_from_output_fixed_enhanced(
     alpha_SM_factor=2.0,
     alpha_DE_factor=0.01
 )
+
+def check_units(data):
+    print("\n" + "="*60)
+    print("UNIT CONVERSION DEBUG")
+    print("="*60)
+
+    M_pl_GeV = 2.4e18
+    final_idx = -1
+    phi_Planck = data['y'][0, final_idx]
+    phi_dot_Planck = data['y'][1, final_idx]
+
+    print(f"In Planck units:")
+    print(f"  φ = {phi_Planck:.3e} M_pl")
+    print(f"  φ̇ = {phi_dot_Planck:.3e} M_pl²")
+
+    print(f"\nIn GeV:")
+    print(f"  φ = {phi_Planck * M_pl_GeV:.3e} GeV")
+    print(f"  φ̇ = {phi_dot_Planck * M_pl_GeV**2:.3e} GeV²")
+
+    # What φ̇ should be during inflation:
+    # H_inf ∼ 10¹³ GeV typical for inflation
+    # φ̇ ∼ H_inf² ∼ 10²⁶ GeV²
+    print(f"\nExpected during inflation:")
+    print(f"  Typical H ∼ 1e13 GeV")
+    print(f"  Typical φ̇ ∼ H² ∼ 1e26 GeV²")
+    print(f"  Your φ̇ is {phi_dot_Planck * M_pl_GeV**2 / 1e26:.1e} times too large!")
+
+check_units(data)
+def debug_n_CS_calculation(data):
+    """Check n_CS calculation"""
+
+    print("\n" + "="*60)
+    print("CHERN-SIMONS CALCULATION DEBUG")
+    print("="*60)
+
+    # Get a single mode
+    k_idx = 0
+    A_idx = 7 + 2*k_idx
+    A_dot_idx = 7 + 2*k_idx + 1
+
+    final_idx = -1
+    A_rescaled = data['y'][A_idx, final_idx]
+    A_dot_rescaled = data['y'][A_dot_idx, final_idx]
+    a = data['y'][5, final_idx]
+    H = data['H'][final_idx] if 'H' in data else 1e-5
+
+    M_pl_GeV = 2.4e18
+
+    print(f"Raw values (Planck units):")
+    print(f"  A_rescaled = {A_rescaled:.3e}")
+    print(f"  A_dot_rescaled = {A_dot_rescaled:.3e}")
+    print(f"  a = {a:.3e}")
+    print(f"  H = {H:.3e}")
+
+    # Convert to physical
+    A_physical = A_rescaled / a
+    A_dot_physical = (A_dot_rescaled - H * A_rescaled) / (a**2)
+
+    print(f"\nPhysical values:")
+    print(f"  A_physical = {A_physical:.3e} (dimensionless? Should be GeV)")
+    print(f"  A_dot_physical = {A_dot_physical:.3e}")
+
+    # Check the n_CS formula
+    k = data['params']['k_array'][k_idx]
+    alpha = data['params']['alpha']
+    fa = data['params']['fa']
+
+    k_physical = k * M_pl_GeV / a
+
+    print(f"\nParameters:")
+    print(f"  k (comoving) = {k:.3e} M_pl⁻¹")
+    print(f"  k_physical = {k_physical:.3e} GeV")
+    print(f"  α = {alpha:.3e}")
+    print(f"  f_a = {fa:.3e} M_pl = {fa * M_pl_GeV:.3e} GeV")
+
+    # n_CS calculation
+    n_CS = (alpha/(np.pi * fa)) * (k_physical**2/(2*np.pi**2)) * A_physical * A_dot_physical
+
+    print(f"\nn_CS calculation:")
+    print(f"  α/(πf) = {alpha/(np.pi * fa):.3e} M_pl⁻¹")
+    print(f"  k²/(2π²) = {k_physical**2/(2*np.pi**2):.3e} GeV²")
+    print(f"  A×Ȧ = {A_physical * A_dot_physical:.3e}")
+    print(f"  n_CS = {n_CS:.3e} GeV³")
+
+    # Expected scale: n_CS ∼ T³ ∼ (100 GeV)³ ∼ 10⁶ GeV³
+    print(f"\nExpected: n_CS ∼ T³ ∼ (100 GeV)³ ∼ 1e6 GeV³")
+    print(f"n_CS is {n_CS / 1e6:.1e} times too large!")
+
+debug_n_CS_calculation(data)
 
 def check_reheating_temperature(sol_state):
     T_reh = (30*rho_r[-1]/(np.pi**2*g_star))**0.25
@@ -2099,14 +2179,11 @@ def run_complete_post_inflation_checks(sol_state):
 
         print(f"   Energy violation: {violation:.2%}")
         if violation > 0.01:  # > 1% is problematic
-            print(f"   ⚠️ ENERGY VIOLATION > 1% - Model has conservation issues")
-            print(f"   (Paper claims this shouldn't happen)")
+            print(f"   ⚠️ ENERGY VIOLATION > 1%")
         else:
             print(f"   ✓ Energy conserved within 1% - Model OK")
 
-        # For check purposes: return True if violation < 1% (normal models)
-        # But paper says violation SHOULD be > 1%
-        return violation < 0.01  # This is reversed from paper's claim!
+        return violation < 0.01
 
     checks = {
         "Energy Conservation": energy_check,
