@@ -1,4 +1,7 @@
 import DifferentialEquations as DE
+import ODEInterfaceDiffEq as ODE
+import LSODA as L
+import Sundials as SD
 
 function axionPotential(mu, phi, Lambda, fa, epsilon)
   linear = mu^3 * sqrt(phi^2+epsilon^2)
