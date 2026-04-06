@@ -1,13 +1,6 @@
-import DifferentialEquations as DE
-import ODEInterfaceDiffEq as ODE
-import LSODA as L
-import Sundials as SD
-using Plots
-using LaTeXStrings
-using Random
-using Printf
-
 module AxionEquations
+  using Random
+  using Printf
   export axionPotential, dVdphi, wde, compute_H, compute_J_gauge, compute_rho_A, bd_initial_conditions, init_integration_weights, nit_mode_bank, make_k_grid,check_energy_conservation
   rng = Xoshiro(1234)
 
