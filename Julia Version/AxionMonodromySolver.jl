@@ -1,11 +1,12 @@
 include("AxionMonodromyEquationFunctions.jl")
-module ODESolver
+module AxionODESolver
   using DifferentialEquations 
   using ODEInterface, ODEInterfaceDiffEq
   using ModelingToolkit
   using JLD2
   using .AxionEquations
   
+  export AxionSystem!, SolveAxion
   function AxionSystem!(dy, y, p, N)
       # 1. State Unpacking
       phi, phi_p = y[1], y[2]
