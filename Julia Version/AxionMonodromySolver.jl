@@ -6,63 +6,90 @@ module ODESolver
   using Plots, LaTeXStrings
   using .AxionEquations
   
-  function AxionSystem!(dy, y,  p, t)
-    phi      = y[1]
-    phi_dot  = y[2]
-    rho_r    = y[3]
-    rho_dm   = y[4]
-    rho_de   = y[5]
-    a        = y[6]
-
+  function AxionSystem_eFolds!(dy, y, p, N) 
+    phi         = y[1]
+    phi_prime   = y[2]
+    rho_r       = y[3]
+    rho_dm      = y[4]
+    rho_de      = y[5]
+    
+    # Constants and Params
     mu, Lambda, fa, epsilon = p[:mu], p[:Lambda], p[:fa], p[:epsilon]
-    alpha, M_pl = p[:alpha], p[:M_pl]
-    k_grid = p[:k_grid]
-    weights = p[:weights]
-    Gamma_phi_r, Gamma_phi_dm, Gamma_phi_de = p[:G_r], p[:G_dm], p[:G_de]
-
+    alpha, M_pl             = p[:alpha], p[:M_pl] # Assuming M_pl = 1
+    k_grid, weights         = p[:k_grid], p[:weights]
+    G_r, G_dm, G_de         = p[:G_r], p[:G_dm], p[:G_de]
+    
+    a = exp(N)
+    
+    # 2. Sum Gauge Contributions (rho_A and J_gauge)
     J_gauge = 0.0
     rho_A_total = 0.0
     n_k = length(k_grid)
 
     for i in 1:n_k
-        idx_A = 6 + (2*i - 1)
-        idx_Adot = idx_A + 1
+        idx_A     = 5 + (2*i - 1)
+        idx_Aprime = idx_A + 1
         
-        Ak, Adotk = y[idx_A], y[idx_Adot]
-        k = k_grid[i]
+        Ak      = y[idx_A]
+        A_prime = y[idx_Aprime]
+        k       = k_grid[i]
         
-        # J_gauge = -(alpha/fa) * (E·B)
-        J_gauge     += AxionEquations.compute_J_gauge(Ak, Adotk, k, alpha, fa, M_pl, a) * weights[i]
-        rho_A_total += AxionEquations.compute_rho_A(Ak, Adotk, k, a) * weights[i]
+        # Note: dot{A} = H * A_prime
+        # rho_A = ( (H*A_prime)^2 + k^2*A^2 ) / (2 * a^2) * (k^2 / 2pi^2)
+        # J_gauge = (alpha/fa) * (k * A * H * A_prime / a^2) * (k^2 / 2pi^2)
+        
+        vol_fac = k^2 / (2 * pi^2)
+        rho_A_total += ( (k^2 * Ak^2) / (2 * a^2) ) * vol_fac * weights[i]
+        # Partial J (missing H factor)
+        J_gauge     += (alpha / fa) * (k * Ak * A_prime / a^2) * vol_fac * weights[i]
     end
-    # 4. Background Evolution (Friedmann)
-    H = AxionEquations.compute_H(phi, phi_dot, rho_r, rho_dm, rho_de, rho_A_total, mu, Lambda, fa, epsilon)
+
+    # 3. Calculate H and H_prime/H
+    # Friedmann: 3H^2 = 0.5(H*phi_prime)^2 + V + rho_r + rho_dm + rho_de + rho_A_total
+    # H^2 * (3 - 0.5*phi_prime^2) = V + rho_others
+    V = AxionEquations.axionPotential(mu, phi, Lambda, fa, epsilon)
+    rho_others = rho_r + rho_dm + rho_de + rho_A_total
     
-    # 5. Scalar Field EOM (Equation 1)
-    Gamma_tot = Gamma_phi_r + Gamma_phi_dm + Gamma_phi_de
+    H2 = rho_others > 0 ? (V + rho_others) / (3.0 - 0.5 * phi_prime^2) : 1e-20
+    H  = sqrt(max(0.0, H2))
+    
+    # Effective pressure for H_prime calculation: p = w*rho
+    p_de = AxionEquations.wde(a) * rho_de
+    p_tot = 0.5*H^2*phi_prime^2 - V + (1/3)*rho_r + p_de + (1/3)*rho_A_total
+    rho_tot = 0.5*H^2*phi_prime^2 + V + rho_r + rho_dm + rho_de + rho_A_total
+    
+    # H_prime / H = d(ln H)/dN = -1.5 * (1 + p_tot/rho_tot)
+    h_ratio = -1.5 * (1.0 + p_tot / rho_tot)
+
+    # 4. Background EOMs (d/dN)
     dV = AxionEquations.dVdphi(mu, phi, Lambda, fa, epsilon)
+    Gamma_tot = G_r + G_dm + G_de
     
-    phi_ddot = -3*H*phi_dot - dV + J_gauge - Gamma_tot*phi_dot
+    # phi_prime_prime
+    # Equation: H^2*phi'' + (H*H' + 3H^2)*phi' + dV = H*J_gauge - Gamma*H*phi'
+    dy[1] = phi_prime
+    dy[2] = (J_gauge / H) - (dV / H^2) - (3.0 + h_ratio + (Gamma_tot / H)) * phi_prime
+    
+    # Fluids (Source term / H)
+    dy[3] = -4.0 * rho_r  + G_r * (H * phi_prime^2)
+    dy[4] = -3.0 * rho_dm + G_dm * (H * phi_prime^2)
+    dy[5] = -3.0 * (1.0 + AxionEquations.wde(a)) * rho_de + G_de * (H * phi_prime^2)
 
-    # 6. Fluid Equations (Equations 6-8)
-    dy[1] = phi_dot
-    dy[2] = phi_ddot
-    dy[3] = -4*H*rho_r  + Gamma_phi_r * phi_dot^2
-    dy[4] = -3*H*rho_dm + Gamma_phi_dm * phi_dot^2
-    dy[5] = -3*H*(1 + AxionEquations.wde(a))*rho_de + Gamma_phi_de * phi_dot^2
-    dy[6] = a * H
-
-    # 7. Gauge Mode EOMs (Equation 3)
+    # 5. Gauge Mode EOMs (d/dN)
     for i in 1:n_k
-        idx_A = 6 + (2*i - 1)
-        idx_Adot = idx_A + 1
+        idx_A = 5 + (2*i - 1)
+        idx_Aprime = idx_A + 1
         k = k_grid[i]
         
-        # ddot{A} + H*dot{A} + (k^2 - (alpha/fa)*phi_dot*k)A = 0
-        A_ddot = ( (alpha/fa)*phi_dot*k - k^2 ) * y[idx_A] - H * y[idx_Adot]
+        k_phys_sq = (k / a)^2
+        instability = (alpha / fa) * (phi_prime * k / a)
         
-        dy[idx_A]    = y[idx_Adot]
-        dy[idx_Adot] = A_ddot
+        dy[idx_A]      = y[idx_Aprime]
+        dy[idx_Aprime] = -(1.0 + h_ratio) * y[idx_Aprime] - (k_phys_sq / H^2 - instability / H) * y[idx_A]
     end
+  end
+
+  function SolveAxion()
+    
   end
 end
