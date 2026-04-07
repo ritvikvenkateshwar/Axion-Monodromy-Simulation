@@ -80,31 +80,22 @@ module AxionEquations
     end
   end
 
-  function init_integration_weights(k_array)
+  function init_log_weights(k_array)
       n = length(k_array)
-      weights = zeros(n)
+      logk = log.(k_array)
+      w_log = zeros(n)
 
-      if n == 1
-          weights[1] = 1.0  # Single point case
-      elseif n == 2
-          val = 0.5 * (k_array[2] - k_array[1])
-          weights[1] = val
-          weights[2] = val
-      else
-          # First point: half-width to the next point
-          weights[1] = 0.5 * (k_array[2] - k_array[1])
-          
-          # Last point: half-width from the previous point
-          weights[end] = 0.5 * (k_array[end] - k_array[end-1])
-          
-          # Middle points: centered difference (average of intervals on both sides)
-          for i in 2:(n-1)
-              weights[i] = 0.5 * (k_array[i+1] - k_array[i-1])
-          end
+      # Midpoint rule in log-space
+      w_log[1] = (logk[2] - logk[1]) / 2.0
+      w_log[end] = (logk[end] - logk[end-1]) / 2.0
+      for i in 2:(n-1)
+          w_log[i] = (logk[i+1] - logk[i-1]) / 2.0
       end
 
-      return weights
+      # Jacobian for k^2 dk -> k^3 d(ln k)
+      return w_log .* (k_array .^ 3)
   end
+
 
 
   function check_energy_conservation(y, params, N)
