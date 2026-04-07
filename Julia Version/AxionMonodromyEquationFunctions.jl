@@ -53,7 +53,7 @@ module AxionEquations
     A_rescaled = a * quantum_amp_physical
     # Add k-dependence: 1/√k scaling from BD vacuum
     # But for numerical stability, don't let it get too small
-    k_factor = 1.0 / sqrt(max(k / (a * k_horizon_crossing), 1.0))
+    k_factor = 1.0 / sqrt(max(k / (k_horizon_crossing), 1.0))
     A_rescaled *= k_factor
     phase = rand(rng) * 2*pi
     A_rescaled *= cos(phase)
