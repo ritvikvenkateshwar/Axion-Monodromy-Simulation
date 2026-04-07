@@ -4,10 +4,11 @@ module AxionODESolver
   using ODEInterface, ODEInterfaceDiffEq
   using ModelingToolkit
   using JLD2
-  using .AxionEquations
+  using ..AxionEquations
   
   export AxionSystem!, SolveAxion
   function AxionSystem!(dy, y, p, N)
+      T = eltype(y) 
       # 1. State Unpacking
       phi, phi_p = y[1], y[2]
       rho_vec = @view y[3:5]
@@ -22,7 +23,7 @@ module AxionODESolver
       J_total = 0.0
       rho_A_mag_total = 0.0
       rho_A_kin_unscaled_total = 0.0
-      rho_A_kin_i = zeros(3)
+      rho_A_kin_i = zeros(T, 3)
 
       for s in 1:3
           start_idx = 5 + (s-1)*(2*Nk) + 1
@@ -40,7 +41,8 @@ module AxionODESolver
 
       # 3. Hubble Dynamics
       V = AxionEquations.axionPotential(p.mu, phi, p.Lambda, p.fa, p.epsilon)
-      denom = 3.0 - 0.5*phi_p^2 - rho_A_kin_unscaled_total
+      d_raw = 3.0 - 0.5*phi_p^2 - rho_A_kin_unscaled_total
+      denom = ifelse(d_raw > 1e-12, d_raw, T(1e-12))
       H2 = (V + sum(rho_vec) + rho_A_mag_total) / max(denom, 1e-12)
       H = sqrt(H2)
       
@@ -109,7 +111,7 @@ module AxionODESolver
     sys = modelingtoolkitize(prob)
     prob_fast = ODEProblem(sys, y0, (0.0, 80.0), p)
     sol = solve(prob_fast, RadauIIA5(), reltol=1e-6, abstol=1e-9)
-    jldsave("axion_output.jld2"; sol)
+    jldsave("axion_output_1.jld2"; sol)
     return sol
   end
 end
