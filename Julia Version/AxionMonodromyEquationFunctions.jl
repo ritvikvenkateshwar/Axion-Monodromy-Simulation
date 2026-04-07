@@ -29,13 +29,15 @@ module AxionEquations
   end
 
   function compute_rho_A(A, A_dot, k, a)
-    energy = (A_dot^2 + k^2 * A^2) / (2 * a^4)
-    return energy
+    volume_element = k^2 / (2 * pi^2)
+    energy_density = (A_dot^2 + k^2 * A^2) / (2 * a^2)
+    return energy_density * volume_element
   end
 
   function compute_J_gauge(A, A_dot, k, alpha, fa, M_pl, a)
-    E_dot_B = - (k * A * A_dot) / a^4
-    return - (1/M_pl)*(alpha / (fa * M_pl)) * E_dot_B
+    volume_factor = k^2 / (2 * pi^2)
+    E_dot_B = - (k * A * A_dot) / a^2 
+    return -(alpha / fa) * E_dot_B * volume_factor
   end
 
   function bd_initial_conditions(k, a, H_start, rng)
@@ -106,7 +108,6 @@ module AxionEquations
 
 
   function check_energy_conservation(y, params, N)
-      # Destructure basic variables (Julia is 1-indexed)
       phi, phi_dot, rho_r, rho_dm, rho_de, a, H = y[1:7]
       
       # Extract params
@@ -118,7 +119,7 @@ module AxionEquations
       V_phi = axionPotential(mu, phi, Lambda, fa, epsilon)
       rho_phi = 0.5 * phi_dot^2 + V_phi
 
-      # Sum over gauge fields (Indices start at 8)
+      # Sum over gauge fields 
       rho_A_total = 0.0
       n_k = length(k_array)
       for i in 1:n_k
